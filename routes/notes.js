@@ -1,20 +1,52 @@
+// requires express and creates notes router
 const notes = require('express').Router();
+// requires random id generator
+const { v4: uuidv4 } = require('uuid');
+// requires functions from fsUtils.js file
 const {
     readFromFile,
     readAndAppend,
     writeToFile,
-  } = require('../helpers/fsUtils');
+  } = require('../helpers/fsUtils.js');
 
-// 
+// GET request with /notes to read the data from db.json then promises to parse the data once retreived
 notes.get('/', (req, res) => {
-
-    // SEND THE FILE `notes.html`
-    res.json( /* send note data */ `${req.method} request received to get notes`);
-
-    console.log(`${req.method} request received to get notes`)
+    readFromFile('./db/db.json').then((data) => res.json(JSON.parse(data)));
 });
 
-// 
+// GET request to load the note clicked on by it's id
+notes.get('/:id', (req, res) => {
+    const noteId = req.params.id;
+    readFromFile('./db/db.json')
+      .then((data) => JSON.parse(data))
+      .then((json) => {
+        const result = json.filter((note) => note.id === noteId);
+        return result.length > 0
+          ? res.json(result)
+          : res.json('No note with that ID');
+      });
+  });
+
+
+// DELETE request to delete note based on it's id, then write the new data to the page
+notes.delete('/:id', (req, res) => {
+    const noteId = req.params.id;
+    readFromFile('./db/db.json')
+        .then((data) => JSON.parse(data))
+        .then((json) => {
+        // Make a new array of all tips except the one with the ID provided in the URL
+        const result = json.filter((note) => note.id !== noteId);
+
+        // Save that array to the filesystem
+        writeToFile('./db/db.json', result);
+
+        // Respond to the DELETE request
+        res.json(`Note ${noteId} has been deleted 🗑️`);
+        });
+});
+
+
+// POST request to create objects with newNote data and store them into the db.json file
 notes.post('/', (req, res) => {
 
     const { title, text } = req.body;
@@ -22,48 +54,16 @@ notes.post('/', (req, res) => {
     if ( title && text ) {
         const newNote = {
             title,
-            text
-        }
+            text,
+            id: uuidv4(),
+        };
         
-        // notes.push( newNote );
-        
-        // const notesString = JSON.stringify( notes );
-        
-        // fs.writeFile(`./db/db.json`, notesString, (err) => 
-        // err 
-        // ? console.error(err)
-        // : console.log(
-        //     `New Note has been written to JSON file`
-        //     )
-        //     );
-            
-        //     const response = {
-        //         status: 'success',
-        //         body: newNote,
-        //     };
-            
-        //     console.log(response);
-        //     res.status(201).json(response);
-        // } else {
-        //     res.status(500).json('Error in posting review');
-        // }
-
         readAndAppend(newNote, './db/db.json');
         res.json('Note added successfully!');
     } else { 
         res.error("Error in adding note")
     };
-
-
-    // Access the note data that was sent
-    // Create (persist) data
-    // Access the new note data from 'req'
-    // Push it to my existing list of notes
-    // Write my updated notes list to the `db.json` file
-
-
-    // res.json(`${req.method} request received to add to notes`);
-    // console.log(`${req.method} request received to add to notes`)
 });
 
+// exports notes to be used in index.js
 module.exports = notes;
